@@ -9,7 +9,7 @@ it does the following
     Crawl the URL
     Summarize the content using NLP tools"
  
-for explaination of code consider the attached ppt
+for explaination of code consider the attached pdf
 
 
 
