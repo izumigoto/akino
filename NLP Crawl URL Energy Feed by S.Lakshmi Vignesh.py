@@ -1,0 +1,80 @@
+import requests
+from bs4 import BeautifulSoup
+import nltk
+from nltk.tokenize import sent_tokenize
+from nltk.corpus import stopwords
+from nltk.cluster.util import cosine_distance
+
+# Crawl the website and extract the content
+url = "https://climate.mit.edu/explainers/carbon-capture"
+page = requests.get(url)
+soup = BeautifulSoup(page.content, "html.parser")
+text = soup.get_text()
+
+# Tokenize the text into sentences
+sentences = sent_tokenize(text)
+
+# Define the scientific_terms to look for
+tokens = nltk.word_tokenize(text)
+# POS tagging
+tagged_tokens = nltk.pos_tag(tokens)
+# extract scientific terms
+scientific_terms = [word for word, pos in tagged_tokens if pos in ["NN","NNS","NNP","NNPS"]]
+
+
+# Create a list to hold the sentences that contain the scientific_terms
+energy_sentences = []
+
+# Iterate over the sentences and check if they contain any of the scientific_terms
+for sentence in sentences:
+    for keyword in scientific_terms:
+        if keyword in sentence:
+            energy_sentences.append(sentence)
+            break
+
+# Create a list of stopwords
+stop_words = stopwords.words("english")
+
+# Create a function to calculate the similarity between sentences
+def sentence_similarity(sent1, sent2, stopwords=None):
+    if stopwords is None:
+        stopwords = []
+    sent1 = [w.lower() for w in sent1]
+    sent2 = [w.lower() for w in sent2]
+    all_words = list(set(sent1 + sent2))
+    vector1 = [0] * len(all_words)
+    vector2 = [0] * len(all_words)
+    for w in sent1:
+        if w in stopwords:
+            continue
+        vector1[all_words.index(w)] += 1
+    for w in sent2:
+        if w in stopwords:
+            continue
+        vector2[all_words.index(w)] += 1
+    return 1 - cosine_distance(vector1, vector2)
+
+# Create a similarity matrix
+similarity_matrix = [[sentence_similarity(sent1, sent2, stop_words) for sent1 in energy_sentences] for sent2 in energy_sentences]
+
+import numpy as np
+
+# Convert the similarity matrix list to a numpy array
+similarity_matrix = np.array(similarity_matrix)
+
+# Use the similarity matrix to generate a summary
+import networkx as nx
+nx_graph = nx.from_numpy_array(similarity_matrix)
+scores = nx.pagerank(nx_graph)
+ranked_sentences = sorted(((scores[i], s) for i, s in enumerate(energy_sentences)), reverse=True)
+
+# Select the top N sentences with the highest scores
+N =10    #default value is set to summarize the content with n number also can be inputed
+top_sentences = [ranked_sentences[i][1] for i in range(N)]
+
+#
+# Join the sentences together to form the summary
+summary = " ".join(top_sentences)
+print(summary,end='')
+print()
+print("from :",url)
